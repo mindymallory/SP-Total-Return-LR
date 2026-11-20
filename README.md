@@ -22,3 +22,7 @@ pip install -r fetch/requirements.txt
 python fetch/fetch_data.py
 cd site && python -m http.server 8000
 ```
+
+## Setup
+
+Pages must use GitHub Actions as its source (Settings → Pages → Source). The site is served under the user site's custom domain at `/SP-Total-Return-LR/`.
