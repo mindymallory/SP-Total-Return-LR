@@ -28,6 +28,7 @@
     { k: '$1 at end of 1925 is now', v: money(d.final_value) },
     { k: 'Realized CAGR', v: pct(d.geometric_cagr) },
     { k: 'R²', v: d.r2.toFixed(4) },
+    { k: 'Now vs trend', v: signed(d.points[d.points.length - 1].value / d.points[d.points.length - 1].fit - 1) },
   ];
   if (d.ytd !== null) stats.push({ k: `${d.ytd_year} year to date`, v: signed(d.ytd) });
   $('stats').innerHTML = stats
@@ -38,6 +39,8 @@
     `The trend is an OLS regression of log(value of $1) on time in years, fitted to every point shown ` +
     `(${d.points.length} points: each year-end since 1925 plus the latest close). The CAGR is exp(slope) − 1. ` +
     `The latest point is a partial year, placed at its actual date so it doesn't bias the slope. ` +
+    `The shaded bands are 50% and 95% OLS prediction intervals, exp(fit ± t·s·√(1 + 1/n + (t − t̄)²/Σ(t − t̄)²)), ` +
+    `with residual s.d. ${d.resid_sd.toFixed(3)} in logs. Residuals are strongly autocorrelated, so treat the bands as descriptive. ` +
     `Realized CAGR is the compound rate from the end of 1925 to the latest close.`;
   $('source').innerHTML =
     `Calendar-year total returns for 1926–${d.splice_year - 1} are the Ibbotson/SBBI large-company series. ` +
@@ -53,11 +56,25 @@
   const xMin = xs[0], xMax = xs[xs.length - 1];
   const actual = d.points.map((p) => ({ x: p.t, y: p.value, p }));
   const fitted = d.points.map((p) => ({ x: p.t, y: p.fit, p }));
+  const band = (k) => d.points.map((p) => ({ x: p.t, y: p[k], p }));
+  const alpha = (hex, a) => {
+    const h = hex.replace('#', '');
+    const n = parseInt(h.length === 3 ? h.split('').map((x) => x + x).join('') : h, 16);
+    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+  };
+  const bandDs = (k, fill, a) => ({
+    label: k, data: band(k), borderWidth: 0, pointRadius: 0, pointHoverRadius: 0,
+    borderColor: 'transparent', backgroundColor: alpha(trend, a), fill, isBand: true,
+  });
 
   const chart = new Chart($('chart'), {
     type: 'line',
     data: {
       datasets: [
+        bandDs('hi95', 1, 0.10),
+        bandDs('lo95', false, 0.10),
+        bandDs('hi50', 3, 0.16),
+        bandDs('lo50', false, 0.16),
         {
           label: 'OLS log-linear fit', data: fitted, borderColor: trend, backgroundColor: trend,
           borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, pointHoverRadius: 3,
@@ -77,11 +94,13 @@
       plugins: {
         legend: { display: false },
         tooltip: {
+          filter: (item) => !item.dataset.isBand,
           callbacks: {
             title: (items) => items[0].raw.p.label,
             label: (ctx) => {
               const p = ctx.raw.p;
-              if (ctx.datasetIndex === 0) return 'Trend: ' + money(p.fit);
+              if (ctx.dataset.label === 'OLS log-linear fit')
+                return [`Trend: ${money(p.fit)}`, `50%: ${money(p.lo50)} – ${money(p.hi50)}`, `95%: ${money(p.lo95)} – ${money(p.hi95)}`];
               let s = 'Value: ' + money(p.value);
               if (p.ret !== null && p.ret !== undefined) s += `  (${signed(p.ret)}${p.partial ? ' YTD' : ''})`;
               return s;

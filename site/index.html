@@ -55,6 +55,9 @@ h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.01
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .swatch { width: 18px; height: 0; border-top: 2px solid var(--line); display: inline-block; }
 .swatch.trend { border-top: 2px dashed var(--trend); }
+.box { width: 14px; height: 10px; border-radius: 2px; display: inline-block; background: var(--trend); }
+.box.b50 { opacity: 0.32; }
+.box.b95 { opacity: 0.14; }
 .controls { display: flex; align-items: center; gap: 10px; }
 button {
   padding: 5px 12px; font: inherit; font-size: 12px; color: var(--text);
@@ -78,6 +81,8 @@ button {
     <div class="legend">
       <span><span class="swatch"></span>Cumulative value of $1</span>
       <span><span class="swatch trend"></span><span id="trendLabel">OLS log-linear fit</span></span>
+      <span><span class="box b50"></span>50% band</span>
+      <span><span class="box b95"></span>95% band</span>
     </div>
     <div class="controls">
       <span id="hint">scroll to zoom, drag to pan</span>

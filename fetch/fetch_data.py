@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pandas as pd
 import yfinance as yf
+from scipy import stats
 
 ROOT = Path(__file__).resolve().parent.parent
 HISTORY = ROOT / "data" / "sbbi_annual_total_returns.csv"
@@ -59,7 +60,11 @@ def ols(t, y):
     beta = sty / stt
     alpha = yb - beta * tb
     sse = sum((b - alpha - beta * a) ** 2 for a, b in zip(t, y))
-    return alpha, beta, 1 - sse / syy
+    s = math.sqrt(sse / (n - 2))
+    return alpha, beta, 1 - sse / syy, s, n, tb, stt
+
+
+BANDS = (0.50, 0.95)
 
 
 def main():
@@ -105,9 +110,19 @@ def main():
 
     t = [p["t"] for p in points]
     logy = [math.log(p["value"]) for p in points]
-    alpha, beta, r2 = ols(t, logy)
+    alpha, beta, r2, s, n, tb, stt = ols(t, logy)
+    # OLS prediction intervals in log space: fit +/- t_q * s * sqrt(1 + 1/n + (t - tbar)^2 / Stt).
+    q = {lvl: stats.t.ppf(0.5 + lvl / 2, n - 2) for lvl in BANDS}
     for p in points:
-        p["fit"] = math.exp(alpha + beta * p["t"])
+        f = alpha + beta * p["t"]
+        se = s * math.sqrt(1 + 1 / n + (p["t"] - tb) ** 2 / stt)
+        p["fit"] = math.exp(f)
+        for lvl in BANDS:
+            k = int(lvl * 100)
+            p[f"lo{k}"] = math.exp(f - q[lvl] * se)
+            p[f"hi{k}"] = math.exp(f + q[lvl] * se)
+    se_beta = s / math.sqrt(stt)
+    q95 = stats.t.ppf(0.975, n - 2)
 
     years = t[-1] - t[0]
     out = {
@@ -117,6 +132,8 @@ def main():
         "ols_cagr": math.exp(beta) - 1,
         "geometric_cagr": points[-1]["value"] ** (1 / years) - 1,
         "r2": r2,
+        "resid_sd": s,
+        "cagr_ci95_naive": [math.exp(beta - q95 * se_beta) - 1, math.exp(beta + q95 * se_beta) - 1],
         "alpha": alpha,
         "beta": beta,
         "ytd": points[-1]["ret"] if points[-1].get("partial") else None,
