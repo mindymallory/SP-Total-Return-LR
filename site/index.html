@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S&amp;P 500 Total Return</title>
+<meta name="description" content="Growth of $1 in the S&P 500 with dividends reinvested since 1926, on a log scale, with an OLS log-linear trend and its implied CAGR. Updated every weekday.">
+<style>
+:root {
+  --bg: #ffffff;
+  --surface: #f4f4f1;
+  --text: #1f1f1d;
+  --muted: #6b6b66;
+  --border: rgba(0,0,0,0.10);
+  --grid: rgba(0,0,0,0.06);
+  --line: #185FA5;
+  --trend: #993C1D;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1b1b1a;
+    --surface: #262624;
+    --text: #ecebe6;
+    --muted: #a3a29c;
+    --border: rgba(255,255,255,0.12);
+    --grid: rgba(255,255,255,0.08);
+    --line: #85B7EB;
+    --trend: #F0997B;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+main { max-width: 1040px; margin: 0 auto; padding: 28px 16px 40px; }
+h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.01em; }
+.sub { color: var(--muted); margin: 0 0 20px; }
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.stat { background: var(--surface); border-radius: 10px; padding: 12px 14px; }
+.stat .k { font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+.stat .v { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.bar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 10px; margin-bottom: 8px; font-size: 12px; color: var(--muted);
+}
+.legend { display: flex; flex-wrap: wrap; gap: 16px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { width: 18px; height: 0; border-top: 2px solid var(--line); display: inline-block; }
+.swatch.trend { border-top: 2px dashed var(--trend); }
+.controls { display: flex; align-items: center; gap: 10px; }
+button {
+  padding: 5px 12px; font: inherit; font-size: 12px; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+}
+.chart-wrap { position: relative; width: 100%; height: clamp(320px, 62vh, 540px); }
+.notes { margin-top: 22px; font-size: 13px; color: var(--muted); max-width: 72ch; }
+.notes p { margin: 0 0 10px; }
+.notes a { color: inherit; }
+.err { padding: 16px; background: var(--surface); border-radius: 10px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Growth of $1 in the S&amp;P 500, dividends reinvested</h1>
+  <p class="sub" id="sub">Log scale, 1926 to today, with an OLS log-linear trend.</p>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="bar">
+    <div class="legend">
+      <span><span class="swatch"></span>Cumulative value of $1</span>
+      <span><span class="swatch trend"></span><span id="trendLabel">OLS log-linear fit</span></span>
+    </div>
+    <div class="controls">
+      <span id="hint">scroll to zoom, drag to pan</span>
+      <button id="reset" type="button">Reset zoom</button>
+    </div>
+  </div>
+
+  <div class="chart-wrap">
+    <canvas id="chart" role="img" aria-label="Line chart on a log scale of the cumulative value of one dollar invested in the S&P 500 total return since the end of 1925, with an OLS log-linear trend line."></canvas>
+  </div>
+
+  <div class="notes">
+    <p id="method"></p>
+    <p id="source"></p>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
