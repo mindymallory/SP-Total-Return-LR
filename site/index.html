@@ -15,6 +15,7 @@
   --grid: rgba(0,0,0,0.06);
   --line: #185FA5;
   --trend: #993C1D;
+  --forecast-bg: rgba(0,0,0,0.035);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -26,6 +27,7 @@
     --grid: rgba(255,255,255,0.08);
     --line: #85B7EB;
     --trend: #F0997B;
+    --forecast-bg: rgba(255,255,255,0.045);
   }
 }
 * { box-sizing: border-box; }
@@ -47,6 +49,7 @@ h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.01
 .stat { background: var(--surface); border-radius: 10px; padding: 12px 14px; }
 .stat .k { font-size: 12px; color: var(--muted); margin-bottom: 2px; }
 .stat .v { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat .s { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .bar {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
   gap: 10px; margin-bottom: 8px; font-size: 12px; color: var(--muted);
@@ -55,6 +58,7 @@ h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.01
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .swatch { width: 18px; height: 0; border-top: 2px solid var(--line); display: inline-block; }
 .swatch.trend { border-top: 2px dashed var(--trend); }
+.swatch.fc { border-top: 2.5px dotted var(--trend); }
 .box { width: 14px; height: 10px; border-radius: 2px; display: inline-block; background: var(--trend); }
 .box.b50 { opacity: 0.32; }
 .box.b95 { opacity: 0.14; }
@@ -83,6 +87,7 @@ button {
       <span><span class="swatch trend"></span><span id="trendLabel">OLS log-linear fit</span></span>
       <span><span class="box b50"></span>50% band</span>
       <span><span class="box b95"></span>95% band</span>
+      <span><span class="swatch fc"></span>10-yr forecast</span>
     </div>
     <div class="controls">
       <span id="hint">scroll to zoom, drag to pan</span>

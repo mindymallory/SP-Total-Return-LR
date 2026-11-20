@@ -65,6 +65,7 @@ def ols(t, y):
 
 
 BANDS = (0.50, 0.95)
+FORECAST_YEARS = 10
 
 
 def main():
@@ -113,7 +114,8 @@ def main():
     alpha, beta, r2, s, n, tb, stt = ols(t, logy)
     # OLS prediction intervals in log space: fit +/- t_q * s * sqrt(1 + 1/n + (t - tbar)^2 / Stt).
     q = {lvl: stats.t.ppf(0.5 + lvl / 2, n - 2) for lvl in BANDS}
-    for p in points:
+
+    def add_fit(p):
         f = alpha + beta * p["t"]
         se = s * math.sqrt(1 + 1 / n + (p["t"] - tb) ** 2 / stt)
         p["fit"] = math.exp(f)
@@ -121,6 +123,23 @@ def main():
             k = int(lvl * 100)
             p[f"lo{k}"] = math.exp(f - q[lvl] * se)
             p[f"hi{k}"] = math.exp(f + q[lvl] * se)
+
+    for p in points:
+        add_fit(p)
+
+    # Forecast: the fitted trend and its prediction intervals extended FORECAST_YEARS past
+    # the latest close, at each future year-end plus the exact horizon.
+    t_last = t[-1]
+    t_end = t_last + FORECAST_YEARS
+    horizon = date(last_date.year + FORECAST_YEARS, last_date.month, min(last_date.day, 28))
+    forecast = []
+    for yr in range(math.floor(t_last) + 1, math.floor(t_end) + 1):
+        if yr - t_last > 0.05:
+            forecast.append({"t": float(yr), "label": f"End of {yr - 1} (forecast)"})
+    forecast.append({"t": t_end, "label": f"{last_date.strftime('%b %-d')}, {horizon.year} (forecast)"})
+    for p in forecast:
+        add_fit(p)
+    end = forecast[-1]
     se_beta = s / math.sqrt(stt)
     q95 = stats.t.ppf(0.975, n - 2)
 
@@ -141,6 +160,11 @@ def main():
         "final_value": points[-1]["value"],
         "splice_year": last_hist_year + 1,
         "points": points,
+        "forecast_years": FORECAST_YEARS,
+        "forecast": forecast,
+        # Annualized return from today's value to the trend's 10-year-ahead value and bands.
+        "forecast_ann_return": {k: (end[k] / points[-1]["value"]) ** (1 / FORECAST_YEARS) - 1
+                                for k in ("fit", "lo50", "hi50", "lo95", "hi95")},
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(out, indent=1))

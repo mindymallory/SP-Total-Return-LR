@@ -20,7 +20,7 @@
 
   const touch = matchMedia('(pointer: coarse)').matches;
   $('hint').textContent = touch ? 'pinch to zoom, drag to pan' : 'scroll to zoom, drag to pan';
-  $('sub').textContent = `Log scale, end of 1925 through ${d.as_of_label}, with an OLS log-linear trend.`;
+  $('sub').textContent = `Log scale, end of 1925 through ${d.as_of_label}, with an OLS log-linear trend and a ${d.forecast_years}-year trend forecast.`;
   $('trendLabel').textContent = `OLS log-linear fit (CAGR ${pct(d.ols_cagr)})`;
 
   const stats = [
@@ -31,8 +31,15 @@
     { k: 'Now vs trend', v: signed(d.points[d.points.length - 1].value / d.points[d.points.length - 1].fit - 1) },
   ];
   if (d.ytd !== null) stats.push({ k: `${d.ytd_year} year to date`, v: signed(d.ytd) });
+  const fEnd = d.forecast[d.forecast.length - 1];
+  const fr = d.forecast_ann_return;
+  stats.push({
+    k: `${d.forecast_years}-yr trend forecast (${fEnd.label.replace(' (forecast)', '')})`,
+    v: money(fEnd.fit),
+    sub: `${pct(fr.fit, 1)}/yr from today · 95%: ${pct(fr.lo95, 1)} to ${pct(fr.hi95, 1)}`,
+  });
   $('stats').innerHTML = stats
-    .map((s) => `<div class="stat"><div class="k">${s.k}</div><div class="v">${s.v}</div></div>`)
+    .map((s) => `<div class="stat"><div class="k">${s.k}</div><div class="v">${s.v}</div>${s.sub ? `<div class="s">${s.sub}</div>` : ''}</div>`)
     .join('');
 
   $('method').textContent =
@@ -41,7 +48,9 @@
     `The latest point is a partial year, placed at its actual date so it doesn't bias the slope. ` +
     `The shaded bands are 50% and 95% OLS prediction intervals, exp(fit ± t·s·√(1 + 1/n + (t − t̄)²/Σ(t − t̄)²)), ` +
     `with residual s.d. ${d.resid_sd.toFixed(3)} in logs. Residuals are strongly autocorrelated, so treat the bands as descriptive. ` +
-    `Realized CAGR is the compound rate from the end of 1925 to the latest close.`;
+    `Realized CAGR is the compound rate from the end of 1925 to the latest close. ` +
+    `The ${d.forecast_years}-year forecast extends the fitted trend and its prediction intervals past the latest close; ` +
+    `the "/yr from today" figures are the annualized returns from today's value to the forecast line and to the 95% band edges.`;
   $('source').innerHTML =
     `Calendar-year total returns for 1926–${d.splice_year - 1} are the Ibbotson/SBBI large-company series. ` +
     `From ${d.splice_year} on, returns come from the S&amp;P 500 Total Return index (^SP500TR, Yahoo Finance), ` +
@@ -52,11 +61,14 @@
   const c = (n) => css.getPropertyValue(n).trim();
   const line = c('--line'), trend = c('--trend'), grid = c('--grid'), tick = c('--muted');
 
-  const xs = d.points.map((p) => p.t);
-  const xMin = xs[0], xMax = xs[xs.length - 1];
+  const all = d.points.concat(d.forecast);
+  const tNow = d.points[d.points.length - 1].t;
+  const xMin = all[0].t, xMax = all[all.length - 1].t;
+  const yMax = Math.max(...all.map((p) => p.hi95)) * 1.15;
   const actual = d.points.map((p) => ({ x: p.t, y: p.value, p }));
-  const fitted = d.points.map((p) => ({ x: p.t, y: p.fit, p }));
-  const band = (k) => d.points.map((p) => ({ x: p.t, y: p[k], p }));
+  const fitted = all.map((p) => ({ x: p.t, y: p.fit, p }));
+  const band = (k) => all.map((p) => ({ x: p.t, y: p[k], p }));
+  const isFc = (ctx) => ctx.p0.parsed.x >= tNow - 1e-9;
   const alpha = (hex, a) => {
     const h = hex.replace('#', '');
     const n = parseInt(h.length === 3 ? h.split('').map((x) => x + x).join('') : h, 16);
@@ -66,6 +78,38 @@
     label: k, data: band(k), borderWidth: 0, pointRadius: 0, pointHoverRadius: 0,
     borderColor: 'transparent', backgroundColor: alpha(trend, a), fill, isBand: true,
   });
+
+  // Shades the forecast region, draws a "Today" divider, and labels Actual / Forecast.
+  const forecastZone = {
+    id: 'forecastZone',
+    beforeDatasetsDraw(ch) {
+      const { ctx, chartArea: a, scales: { x } } = ch;
+      const px = x.getPixelForValue(tNow);
+      if (px >= a.right) return;
+      const left = Math.max(px, a.left);
+      ctx.save();
+      ctx.fillStyle = c('--forecast-bg');
+      ctx.fillRect(left, a.top, a.right - left, a.bottom - a.top);
+      ctx.restore();
+    },
+    afterDatasetsDraw(ch) {
+      const { ctx, chartArea: a, scales: { x } } = ch;
+      const px = x.getPixelForValue(tNow);
+      if (px <= a.left || px >= a.right) return;
+      ctx.save();
+      ctx.strokeStyle = tick;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(px, a.top); ctx.lineTo(px, a.bottom); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = tick;
+      ctx.font = '600 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.textBaseline = 'top';
+      ctx.textAlign = 'right'; ctx.fillText('Actual', px - 6, a.top + 6);
+      ctx.textAlign = 'left'; ctx.fillText('Forecast', px + 6, a.top + 6);
+      ctx.restore();
+    },
+  };
 
   const chart = new Chart($('chart'), {
     type: 'line',
@@ -78,6 +122,7 @@
         {
           label: 'OLS log-linear fit', data: fitted, borderColor: trend, backgroundColor: trend,
           borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, pointHoverRadius: 3,
+          segment: { borderDash: (ctx) => (isFc(ctx) ? [2, 3] : undefined), borderWidth: (ctx) => (isFc(ctx) ? 2.25 : undefined) },
         },
         {
           label: 'Value of $1', data: actual, borderColor: line, backgroundColor: line,
@@ -85,6 +130,7 @@
         },
       ],
     },
+    plugins: [forecastZone],
     options: {
       responsive: true,
       maintainAspectRatio: false,
@@ -101,6 +147,7 @@
               const p = ctx.raw.p;
               if (ctx.dataset.label === 'OLS log-linear fit')
                 return [`Trend: ${money(p.fit)}`, `50%: ${money(p.lo50)} – ${money(p.hi50)}`, `95%: ${money(p.lo95)} – ${money(p.hi95)}`];
+              if (p.value === undefined) return '';
               let s = 'Value: ' + money(p.value);
               if (p.ret !== null && p.ret !== undefined) s += `  (${signed(p.ret)}${p.partial ? ' YTD' : ''})`;
               return s;
@@ -123,7 +170,7 @@
           grid: { color: grid },
         },
         y: {
-          type: 'logarithmic', min: 0.2, max: Math.pow(10, Math.ceil(Math.log10(d.final_value * 1.5))),
+          type: 'logarithmic', min: 0.2, max: yMax,
           ticks: {
             color: tick,
             callback: (v) => {
